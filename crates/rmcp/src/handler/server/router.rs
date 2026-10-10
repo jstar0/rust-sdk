@@ -95,7 +95,11 @@ where
         request: <RoleServer as crate::service::ServiceRole>::PeerReq,
         context: crate::service::RequestContext<RoleServer>,
     ) -> Result<<RoleServer as crate::service::ServiceRole>::Resp, crate::ErrorData> {
-        match request {
+        let is_2026_07_28_or_later = context
+            .protocol_version()
+            .as_ref()
+            .is_some_and(|version| version.as_str() >= ProtocolVersion::V_2026_07_28.as_str());
+        let mut result = match request {
             ClientRequest::CallToolRequest(request) => {
                 if self
                     .tool_router
@@ -147,7 +151,11 @@ where
                 }))
             }
             rest => self.service.handle_request(rest, context).await,
+        };
+        if !is_2026_07_28_or_later && let Ok(result) = &mut result {
+            result.strip_non_object_tool_output_for_legacy_peer();
         }
+        result
     }
 
     fn get_info(&self) -> <RoleServer as crate::service::ServiceRole>::Info {

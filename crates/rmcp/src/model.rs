@@ -4764,6 +4764,37 @@ impl ServerResult {
         ServerResult::TaskAckResult(TaskAckResult::new())
     }
 
+    /// Remove non-object tool output fields that older protocol versions cannot represent.
+    ///
+    /// Before `2026-07-28`, output schemas must describe an object and
+    /// structured results must be objects. The newer revision permits schemas
+    /// for any JSON value and arbitrary JSON structured results.
+    pub(crate) fn strip_non_object_tool_output_for_legacy_peer(&mut self) {
+        match self {
+            ServerResult::ListToolsResult(result) => {
+                for tool in &mut result.tools {
+                    let has_object_output_schema = tool
+                        .output_schema
+                        .as_ref()
+                        .and_then(|schema| schema.get("type"))
+                        .is_some_and(|schema_type| schema_type == "object");
+                    if !has_object_output_schema {
+                        tool.output_schema = None;
+                    }
+                }
+            }
+            ServerResult::CallToolResult(result)
+                if result
+                    .structured_content
+                    .as_ref()
+                    .is_some_and(|value| !value.is_object()) =>
+            {
+                result.structured_content = None;
+            }
+            _ => {}
+        }
+    }
+
     /// Strip the SEP-2322 `resultType: "complete"` discriminator so the result
     /// keeps the wire shape that predates protocol version `2026-07-28`.
     ///

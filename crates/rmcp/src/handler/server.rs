@@ -255,6 +255,7 @@ impl<H: ServerHandler> Service<RoleServer> for H {
                 if is_2026_07_28_or_later {
                     result.fill_missing_cache_hints();
                 } else {
+                    result.strip_non_object_tool_output_for_legacy_peer();
                     result.strip_result_type_for_legacy_peer();
                 }
                 Ok(result)
